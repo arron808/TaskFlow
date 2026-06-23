@@ -3,13 +3,12 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import { MaterialIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../lib/supabase';
+import TaskItem from '../components/TaskItem';
+import AddTaskModal from '../components/AddTaskModal';
 
-// Phase 5: Supabase CRUD
-// loadTasks   — SELECT all tasks ordered by created_at DESC
-// handleSubmitTask  — INSERT a new task row
-// handleToggleTask  — UPDATE completed flag on a task
-// handleDeleteTask  — DELETE a task by id
-// Always check { error } before trusting { data }
+// Phase 6: Componentization
+// TaskItem      — presentational row, receives item / onToggle / onDelete
+// AddTaskModal  — slide-up modal, receives visible / onClose / onSubmit
 
 export default function HomeScreen() {
   // ── State ──────────────────────────────────────────────
@@ -98,23 +97,11 @@ export default function HomeScreen() {
         data={tasks}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          // Tap = toggle | Long press = delete
-          <TouchableOpacity
-            style={styles.taskRow}
-            onPress={() => handleToggleTask(item)}
-            onLongPress={() => handleDeleteTask(item.id)}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name={item.completed ? 'check-box' : 'check-box-outline-blank'}
-              size={24}
-              color="#2E5BBA"
-            />
-            <Text style={[styles.taskTitle, item.completed && styles.taskDone]}>
-              {item.title}
-            </Text>
-            <MaterialIcons name="drag-handle" size={20} color="#C8D0DC" />
-          </TouchableOpacity>
+          <TaskItem
+            item={item}
+            onToggle={handleToggleTask}
+            onDelete={handleDeleteTask}
+          />
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -124,6 +111,13 @@ export default function HomeScreen() {
           </View>
         }
         contentContainerStyle={styles.listContent}
+      />
+
+      {/* ── Add Task Modal ── */}
+      <AddTaskModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSubmit={handleSubmitTask}
       />
 
     </View>
@@ -158,37 +152,14 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
-  // Task rows
+  // Task rows — now handled by TaskItem component
   listContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 32,
   },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  taskTitle: {
-    fontSize: 16,
-    color: '#1F2A44',
-    flex: 1,
-  },
-  taskDone: {
-    textDecorationLine: 'line-through',
-    color: '#5A6472',
-  },
+  // (taskRow, taskTitle, taskDone styles moved to components/TaskItem.jsx)
 
   // Empty state
   emptyState: {
