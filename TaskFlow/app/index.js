@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
+import { supabase } from '../lib/supabase';
 
-// Phase 4: State and Hooks
-// useState manages local task data and modal visibility
-// useEffect runs loadTasks once when the screen first mounts
-// Phase 5 will replace the mock data with real Supabase calls
-
-// Mock tasks — shape matches the Supabase row: { id, title, completed, created_at }
-const MOCK_TASKS = [
-  { id: '1', title: 'Buy groceries', completed: false, created_at: new Date().toISOString() },
-  { id: '2', title: 'Read chapter 3', completed: true, created_at: new Date().toISOString() },
-  { id: '3', title: 'Submit assignment', completed: false, created_at: new Date().toISOString() },
-];
+// Phase 5: Supabase CRUD
+// loadTasks   — SELECT all tasks ordered by created_at DESC
+// handleSubmitTask  — INSERT a new task row
+// handleToggleTask  — UPDATE completed flag on a task
+// handleDeleteTask  — DELETE a task by id
+// Always check { error } before trusting { data }
 
 export default function HomeScreen() {
   // ── State ──────────────────────────────────────────────
@@ -24,9 +21,62 @@ export default function HomeScreen() {
     loadTasks();
   }, []);
 
-  // Phase 4: local mock — Phase 5 replaces this with Supabase
-  function loadTasks() {
-    setTasks(MOCK_TASKS);
+  // ── READ ───────────────────────────────────────────────
+  async function loadTasks() {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      Toast.show({ type: 'error', text1: 'Could not load tasks', text2: error.message });
+      return;
+    }
+    setTasks(data ?? []);
+  }
+
+  // ── CREATE ─────────────────────────────────────────────
+  async function handleSubmitTask(title) {
+    const { error } = await supabase
+      .from('tasks')
+      .insert([{ title, completed: false }]);
+
+    if (error) {
+      Toast.show({ type: 'error', text1: 'Could not add task', text2: error.message });
+      return;
+    }
+    setModalVisible(false);
+    await loadTasks();
+    Toast.show({ type: 'success', text1: 'Task added' });
+  }
+
+  // ── UPDATE (toggle) ────────────────────────────────────
+  async function handleToggleTask(item) {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ completed: !item.completed })
+      .eq('id', item.id);
+
+    if (error) {
+      Toast.show({ type: 'error', text1: 'Could not update task', text2: error.message });
+      return;
+    }
+    await loadTasks();
+  }
+
+  // ── DELETE ─────────────────────────────────────────────
+  async function handleDeleteTask(id) {
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      Toast.show({ type: 'error', text1: 'Could not delete task', text2: error.message });
+      return;
+    }
+    await loadTasks();
+    Toast.show({ type: 'success', text1: 'Task deleted' });
   }
 
   return (
@@ -48,7 +98,13 @@ export default function HomeScreen() {
         data={tasks}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.taskRow}>
+          // Tap = toggle | Long press = delete
+          <TouchableOpacity
+            style={styles.taskRow}
+            onPress={() => handleToggleTask(item)}
+            onLongPress={() => handleDeleteTask(item.id)}
+            activeOpacity={0.7}
+          >
             <MaterialIcons
               name={item.completed ? 'check-box' : 'check-box-outline-blank'}
               size={24}
@@ -57,7 +113,8 @@ export default function HomeScreen() {
             <Text style={[styles.taskTitle, item.completed && styles.taskDone]}>
               {item.title}
             </Text>
-          </View>
+            <MaterialIcons name="drag-handle" size={20} color="#C8D0DC" />
+          </TouchableOpacity>
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
